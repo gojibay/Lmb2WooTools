@@ -144,10 +144,10 @@ if __name__ == '__main__':
     parser=OptionParser(usage=usage)
     parser.add_option("--trace" ,action="store_true",dest="trace",default=False,help="A utiliser pour declencher un mode verbeux. Default=False")
     parser.add_option("--user1" , dest="user1", help='user Default=user1')
-    parser.add_option("--pass1" , dest="pwd1", help='pwd Default=pass1')
+    parser.add_option("--pwd1" , dest="pwd1", help='pwd Default=pass1')
     parser.add_option("--db1"   , dest="db1"  , help='db Default=db1')
     parser.add_option("--user2" , dest="user2", help='user Default=user2')
-    parser.add_option("--pass2" , dest="pwd2", help='pwd Default=pass2')
+    parser.add_option("--pwd2" , dest="pwd2", help='pwd Default=pass2')
     parser.add_option("--db2"   , dest="db2"  , help='db Default=db2')
     parser.add_option("--output", dest="csv_filename", default='output.csv', help='filename for csv output Default=output.csv')
 
@@ -158,21 +158,21 @@ if __name__ == '__main__':
 
     # db1 info
     user1 = str(opts.user1)
-    pass1 = str(opts.pwd1)
+    pwd1 = str(opts.pwd1)
     db1   = str(opts.db1)
 
 
     # db2 info
     user2 = str(opts.user2)
-    pass2 = str(opts.pwd2)
+    pwd2 = str(opts.pwd2)
     db2   = str(opts.db2)
 
     csv_filename = str(opts.csv_filename)
 
     # create a connection handler
     # 2 connection to 2 different databases
-    myconn1 = connector("127.0.0.1", 3306, "user", "passwd", "db_name" )
-    myconn2 = connector("127.0.0.1", 3306, "user", "passwd", "db_name" )
+    myconn1 = connector("127.0.0.1", 3307, user1, pwd1, db1 )
+    myconn2 = connector("127.0.0.1", 3307, user2, pwd2, db2 )
 
     # 2 instances of myops class
     myops_read  = myops(myconn1)
