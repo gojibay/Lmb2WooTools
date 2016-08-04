@@ -5,7 +5,7 @@ __author__ = 'lgp'
 
 import pymysql
 import logging
-import optparse
+from optparse import OptionParser
 
 class connector:
 
