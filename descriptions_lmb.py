@@ -5,6 +5,7 @@ __author__ = 'lgp'
 
 import pymysql
 import logging
+import optparse
 
 class connector:
 
@@ -76,7 +77,6 @@ class myops:
                         ]
 
         """
-
         # will store all the requests
         myrequests = []
 
@@ -129,9 +129,45 @@ class myops:
         logging.warn("cannot decode url %s" % ([string]))
 
 
-
-
 if __name__ == '__main__':
+
+    usage = """
+
+        Script qui extrait des données de la db1 et génère soit :
+            - les requêtes sql pour l'update d'une deuxième base db2
+            - le fichier csv contenant les datas
+
+        %prog --user1 username --pass1 pwd --db1 dbname --user2 username --pass2 pwd --db2 dbname
+
+    """
+
+    parser=OptionParser(usage=usage)
+    parser.add_option("--trace" ,action="store_true",dest="trace",default=False,help="A utiliser pour declencher un mode verbeux. Default=False")
+    parser.add_option("--user1" , dest="user1", help='user Default=user1')
+    parser.add_option("--pass1" , dest="pwd1", help='pwd Default=pass1')
+    parser.add_option("--db1"   , dest="db1"  , help='db Default=db1')
+    parser.add_option("--user2" , dest="user2", help='user Default=user2')
+    parser.add_option("--pass2" , dest="pwd2", help='pwd Default=pass2')
+    parser.add_option("--db2"   , dest="db2"  , help='db Default=db2')
+    parser.add_option("--output", dest="csv_filename", default='output.csv', help='filename for csv output Default=output.csv')
+
+    (opts,args) = parser.parse_args()
+
+    if len(args) > 0:
+        mode = args[0].lower()
+
+    # db1 info
+    user1 = str(opts.user1)
+    pass1 = str(opts.pwd1)
+    db1   = str(opts.db1)
+
+
+    # db2 info
+    user2 = str(opts.user2)
+    pass2 = str(opts.pwd2)
+    db2   = str(opts.db2)
+
+    csv_filename = str(opts.csv_filename)
 
     # create a connection handler
     # 2 connection to 2 different databases
@@ -143,7 +179,10 @@ if __name__ == '__main__':
     myops_write = myops(myconn2)
 
     # launch task function
+    # 1/ retrieve data
     data = myops_read.retrieve_fields("articles", ["ref_article", "desc_courte", "desc_longue"], {"ref_art_categ" : "A.C-000000-00003" })
+
+    # 2/ write data
     myops_write.write_fields("articles_write_utf8", "ref_article", data)
 
     # close cursor and connection
