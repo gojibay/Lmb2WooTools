@@ -8,6 +8,7 @@ import logging
 import csv
 import pprint as pp
 from optparse import OptionParser
+import re
 
 class connector:
 
@@ -135,35 +136,50 @@ class myops:
 
         """
 
-        print(fname)
-        with open(fname, 'w', newline='') as csvfile:
-            spamwriter = csv.writer(csvfile, delimiter=';',
-                            quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        print("ok")
+        print("About to write to : " +  str(fname))
+        print(data)
 
-        # generate lines
-        for elt in data:
-            line = []
+        newline_regexp = ""
+
+        spamwriter = ''
+        print("#######################################")
+        with open(fname, 'w', newline='') as csvfile:
+            spamwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        
             print("ok")
 
-            for field in keyfields:
-                v = elt[field]
-                forcedec_v = self.force_decode(v)
-                forcedec_v.encode("iso-8859-1")
-                line.append(forcedec_v)
-                print(line)
+            # generate lines
+            for elt in data:
+                line = []
+                print("ok")
 
-            spamwriter.writerow(line)
+                for field in keyfields:
+                    v = elt[field]
+                    # force de decoding
+                    forcedec_v = self.force_decode(v)
+                    print("@@@@@@@@@@@@@@@@@" + forcedec_v)
+                    # force encode to a codec
+                    forcedec_v.encode("utf8")
+                    
+                    line.append(forcedec_v.replace('\r\n', ' ').replace('\n', ' '))
+                    
+                    #print(line)
+
+                spamwriter.writerow(line)
 
 
     def force_decode(self, string, codecs=['cp1252', 'utf8', 'iso-8859-1']):
+        """
+            the function tries to decode the string given a list of codecs
+            return nothing is cannot decode
+        """
         for i in codecs:
             try:
                 s = string.decode(i)
                 return s
             except:
                 pass
-
+        return string
         logging.warn("cannot decode url %s" % ([string]))
 
 
@@ -217,7 +233,7 @@ if __name__ == '__main__':
     data = myops_read.retrieve_fields("articles", ["ref_article", "desc_courte", "desc_longue"], {"ref_art_categ" : "A.C-000000-00003" })
     #myops_write.write_mysql_update_request("articles_write_utf8", "ref_article", data)
 
-    myops.write_csv("output.csv", ["ref_article", "desc_courte", "desc_longue"], data)
+    myops_read.write_csv("output.csv", ["ref_article", "desc_courte", "desc_longue"], data)
 
 
 
@@ -226,7 +242,7 @@ if __name__ == '__main__':
     myconn1.cursor.close()
     myconn1.conn.close()
     # connexion 2
-    myconn2.cursor.close()
-    myconn2.conn.close()
+    #myconn2.cursor.close()
+    #myconn2.conn.close()
 
     pass
