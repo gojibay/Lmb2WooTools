@@ -37,6 +37,16 @@ class myops:
 
     def __init__(self, connector):
         self.connector = connector
+        self.categories = dict()
+        self.annuaire = dict()
+        self.images = dict()
+
+    def initialize(self):
+        self.fetch_categories()
+        #print(self.categories)
+        self.fetch_contacts()
+        #print(self.annuaire)
+        self.fetch_images()
 
     def retrieve_fields(self, table="", fields_to_retrieve=[], filter_on={}, filter_exclude={}):
         """
@@ -47,12 +57,14 @@ class myops:
         filter ref_art_categ = A.C-000000-00003
         desc_courte
         desc_longue
+
+
         """
 
         # retrieve fields to get data from
         fields = ""
         for f in fields_to_retrieve:
-            fields = fields + f + ","
+            fields += f + ","
         fields = fields.strip(',')
 
         # retrieve field and value to filter on
@@ -63,13 +75,13 @@ class myops:
         if len(filter_on) > 0:
             for key,value in filter_on.items():
                 sql_filter_on = key + " = '" + value + "'"
-                print(sql_filter_on)
+                #print(sql_filter_on)
 
         sql_filter_exclude = ""
         if len(filter_exclude) > 0:
             for key,value in filter_exclude.items():
                 sql_filter_exclude = key + " != '" + value + "'"
-                print(sql_filter_exclude)
+                #print(sql_filter_exclude)
 
         sql_filter = ""
         if ( sql_filter_on == "" and sql_filter_exclude == "") :
@@ -88,7 +100,7 @@ class myops:
             myrequest += " WHERE " + sql_filter
         myrequest += " ;"
 
-        print(myrequest)
+        #print(myrequest)
 
         self.connector.cursor.execute(myrequest)
         #print(self.cursor.description)
@@ -97,59 +109,8 @@ class myops:
         result = self.connector.cursor.fetchall()
         return result
 
-    def write_mysql_update_request(self, table="", key_field="ref_article", data=[]):
-        """
-        This function writes the data 'data' in table 'table'
 
-        exemple data : [
-                        {'desc_longue': b'Placer le lien vers la fiche PDF constructeur<br>',
-                        'desc_courte': b'appareil auditif dual V OTICON',
-                        'ref_article': 'A-000000-00005'}
-                        ]
-
-        """
-
-        # will store all the requests
-        myrequests = []
-
-        key_field_value = ""
-
-        # generate mysql requests
-        for elt in data:
-            cols_values = ""
-            myrequest = ""
-            myrequest_insert = ""
-            for k,v in elt.items():
-                if k != key_field:
-                    forcedec_v = self.force_decode(v)
-                    forcedec_v.encode("iso-8859-1")
-                    forcedec_v = forcedec_v.replace("'", "\\'")
-                    cols_values = cols_values + k + "='" + str(forcedec_v) + "',"
-
-                else:
-                    key_field_value = str(v)
-                    # used once if table empty (for test purpose)
-                    myrequest_insert = "INSERT INTO "+table+"("+key_field+") VALUES ('"+ key_field_value +"')"
-            cols_values = cols_values.strip(',')
-
-            # generate MYSQL request
-            myrequest = "UPDATE " + table + " "
-            myrequest = myrequest + " SET " + cols_values + " "
-            myrequest = myrequest + " WHERE " + key_field +"='" + key_field_value  + "' "
-            myrequest = myrequest + " ;"
-
-            #myrequests.append(myrequest_insert)
-            myrequests.append(myrequest)
-
-        for req in myrequests:
-            #print(req)
-            self.connector.cursor.execute(req)
-            self.connector.conn.commit()
-            pass
-
-
-
-    def write_csv(self, fname="output.csv", keyfields=['ref_article', 'desc_courte', 'desc_longue'], data=[]):
+    def write_csv(self, fname="output.csv", keyfields=['ref_article'], data=[]):
         """
         This function writes the data 'data' in a csv file
 
@@ -164,13 +125,13 @@ class myops:
 
         """
 
-        print("About to write to : " +  str(fname))
+        print("Writing to " +  str(fname) + " ... ")
         #print(data)
 
         newline_regexp = ""
 
         spamwriter = ''
-        print("#######################################")
+        #print("#######################################")
         with open(fname, 'w', newline='') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
@@ -179,19 +140,115 @@ class myops:
                 line = []
 
                 for field in keyfields:
-                    v = elt[field]
+                    if ( field == 'image'):
+                        v = elt['ref_article']
+                        v = self.get_image_filename(v)
+                    else:
+                        v = elt[field]
+                    if ( field == "ref_art_categ" ):
+                        #print(field + " "  + v)
+                        v = self.get_categorylib_from_ref(v) + ' ## ' + v
+                    if ( field == "ref_constructeur" ):
+                        #print(field + " "  + str(v))
+                        if v:
+                            v = self.get_nom_from_refcontact(v)
+                    if ( field == 'image'):
+                        v = elt['ref_article']
+                        v = self.get_image_filename(v)
+
                     # force de decoding
                     forcedec_v = self.force_decode(v)
-                    print("@@@@@@@@@@@@@@@@@" + str(forcedec_v))
+                    #print("@@@@@@@@@@@@@@@@@" + str(forcedec_v))
                     # force encode to a codec
                     if type(forcedec_v) == type(str()):
                         forcedec_v.encode("utf8")
                         line.append(forcedec_v.replace('\r\n', ' ').replace('\n', ' '))
                     else:
                         line.append(forcedec_v)
-                        
+
                 spamwriter.writerow(line)
 
+
+
+    def fetch_categories(self):
+        """
+            fetch categories from art_categs table and return a dict of ref:lib  
+
+            exemple : {'A.C-000000-00026':'ACCESSOIRES DIVERS'}
+        """
+        req = "SELECT ref_art_categ, lib_art_categ FROM `art_categs`"
+        self.connector.cursor.execute(req)
+        result = self.connector.cursor.fetchall()
+        d = {}
+        for item in result:
+            ref = item['ref_art_categ']
+            lib = item['lib_art_categ']
+            d[ref] = lib
+            #print(ref + ' ' +  lib)
+
+        self.categories = d
+
+
+    def fetch_contacts(self):
+        """
+            fetch names from 'annuaire' table and return a dict of ref:lib  
+
+            exemple : {'C-000000-00026':'REXTON'}
+        """
+        req = "SELECT ref_contact, nom FROM `annuaire`"
+        self.connector.cursor.execute(req)
+        result = self.connector.cursor.fetchall()
+        d = {}
+        for item in result:
+            ref = item['ref_contact']
+            lib = item['nom']
+            d[ref] = lib
+
+        self.annuaire = d
+
+    def fetch_images(self):
+        request = "SELECT a.ref_article, b.lib_file, c.ref_art_categ FROM articles_images AS a, images_articles AS b, articles AS c WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article AND a.ordre=1 AND c.ref_art_categ!='A.C-000000-00003'"
+        d = self.fetch_data_in_db(request, 'ref_article', 'lib_file')
+        self.images = d
+
+    def fetch_data_in_db(self, req, key, value):
+        """
+            exemple 
+            SELECT a.ref_article, b.lib_file, c.ref_art_categ FROM articles_images AS a, images_articles AS b, articles AS c WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article AND a.ordre=1 AND c.ref_art_categ!='A.C-000000-00003'
+        """
+        d = {}
+        try:
+            if req:
+                self.connector.cursor.execute(req)
+                result = self.connector.cursor.fetchall()
+                for item in result:
+                    k = item[key]
+                    v = item[value]
+                    d[k] = v
+            return d
+        except:
+            return {}
+
+    def get_categorylib_from_ref(self, ref):
+        if len(self.categories):
+            return self.categories[ref]
+        return ''
+
+    def get_nom_from_refcontact(self, ref):
+        if len(self.annuaire):
+            return self.annuaire[ref]
+        return ''
+
+    def get_image_filename(self, ref):
+        if len(self.images):
+            try:
+                fimg = self.images[ref]
+                url = "http://www.audiologys.com/catalogue/fichiers/images/articles/"+fimg
+                return url
+            except:
+                return ''
+                
+        return ''
 
     def force_decode(self, string, codecs=['cp1252', 'utf8', 'iso-8859-1']):
         """
@@ -250,17 +307,20 @@ if __name__ == '__main__':
     myconn1 = connector("127.0.0.1", 3307, user1, pass1, db1 )
     #myconn2 = connector("127.0.0.1", 3306, "user", "passwd", "db_name" )
 
-    # 2 instances of myops class
-    myops_read  = myops(myconn1)
-    #myops_write = myops(myconn2)
+    # create instance of myops class
+    print("Create instance...")
+    controller = myops(myconn1)
+    print("Initializing...")
+    controller.initialize()
 
+    print("Retrieving fields...")
     # launch task function
-    data = myops_read.retrieve_fields("articles", ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo"], {} , {"ref_art_categ" : "A.C-000000-00003" })
+    data = controller.retrieve_fields("articles", ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"], {} , {"ref_art_categ" : "A.C-000000-00003" })
     #myops_write.write_mysql_update_request("articles_write_utf8", "ref_article", data)
 
     #print(data)
 
-    myops_read.write_csv("output.csv", ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo"], data)
+    controller.write_csv("output.csv", ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "image"], data)
 
 
 
