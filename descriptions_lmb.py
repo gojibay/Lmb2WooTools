@@ -201,10 +201,10 @@ if __name__ == '__main__':
 
     parser=OptionParser(usage=usage)
     parser.add_option("--trace" ,action="store_true",dest="trace",default=False,help="A utiliser pour declencher un mode verbeux. Default=False")
-    parser.add_option("--user1" , dest="user", help='user Default=user1')
-    parser.add_option("--pass1" , dest="pwd1", help='pwd Default=pass1')
-    parser.add_option("--db1"   , dest="db1"  , help='db Default=db1')
-    parser.add_option("--output", dest="csv_filename", default='output.csv', help='filename for csv output Default=output.csv')
+    parser.add_option("--user1" , dest="user", help='user Default=user1', default="audiologys")
+    parser.add_option("--pass1" , dest="pwd1", help='pwd Default=pass1', default="audiologys")
+    parser.add_option("--db1"   , dest="db1"  , help='db Default=db1', default="audiologys_utf8")
+    parser.add_option("--output", dest="csv_filename", default='output.csv', help='filename for csv output Default=output.csv', default="description.csv")
 
     (opts,args) = parser.parse_args()
 
@@ -233,7 +233,7 @@ if __name__ == '__main__':
     data = myops_read.retrieve_fields("articles", ["ref_article", "desc_courte", "desc_longue"], {"ref_art_categ" : "A.C-000000-00003" })
     #myops_write.write_mysql_update_request("articles_write_utf8", "ref_article", data)
 
-    myops_read.write_csv("output.csv", ["ref_article", "desc_courte", "desc_longue"], data)
+    myops_read.write_csv(csv_filename, ["ref_article", "desc_courte", "desc_longue"], data)
 
 
 

@@ -314,7 +314,7 @@ if __name__ == '__main__':
     parser.add_option("--db1"   , dest="db1"  , help='db Default=db1', default="audiologys_utf8")
     parser.add_option("--port1"   , dest="port1"  , help='port Default=3307', default=3307)
 
-    parser.add_option("--output", dest="csv_filename", default='output.csv', help='filename for csv output Default=output.csv')
+    parser.add_option("--output", dest="csv_filename", default='products.csv', help='filename for csv output Default=output.csv')
 
     (opts,args) = parser.parse_args()
 
@@ -344,8 +344,17 @@ if __name__ == '__main__':
 
     print("Retrieving fields...")
     # launch task function
+
+    # Optional products : 
+    fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"]
+
+    # Appareils auditifs
+    fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"]
+
+
+
     data = controller.retrieve_fields("articles", 
-        ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"], 
+        fields_list, 
         {"ref_art_categ" : "A.C-000000-00003" },
         {}
         )
@@ -403,10 +412,9 @@ if __name__ == '__main__':
 
     #print(data)
 
+    # write fields list to csv file
     controller.write_csv(csv_filename, 
-        ["ref_article", "lib_article", "desc_courte", "desc_longue", 
-        "ref_art_categ", "modele", "ref_constructeur", 
-        "paa_ht", "id_tva", "dispo", "image"], 
+        fields_list, 
         data)
 
 
