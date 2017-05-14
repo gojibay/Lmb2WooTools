@@ -6,6 +6,9 @@ __author__ = 'lgp'
 import pymysql
 import logging
 from optparse import OptionParser
+import csv
+import pprint as pp
+import re
 
 class connector:
 
@@ -66,7 +69,7 @@ class myops:
         result = self.connector.cursor.fetchall()
         return result
 
-    def write_fields(self, table="", key_field="ref_article", data=[]):
+    def write_mysql_update_request(self, table="", key_field="ref_article", data=[]):
         """
         This function writes the data 'data' in table 'table'
 
@@ -109,23 +112,73 @@ class myops:
             #myrequests.append(myrequest_insert)
             myrequests.append(myrequest)
 
-
-
-
         for req in myrequests:
             #print(req)
             self.connector.cursor.execute(req)
             self.connector.conn.commit()
             pass
 
+
+
+    def write_csv(self, fname="output.csv", keyfields=['ref_article', 'desc_courte', 'desc_longue'], data=[]):
+        """
+        This function writes the data 'data' in a csv file
+
+        exemple data : [
+                        {'desc_longue': b'Placer le lien vers la fiche PDF constructeur<br>',
+                        'desc_courte': b'appareil auditif dual V OTICON',
+                        'ref_article': 'A-000000-00005'}
+                        ]
+
+            csv file :
+            A-000000-00005;'appareil auditif dual V OTICON';'Placer le lien vers la fiche PDF constructeur<br>'
+
+        """
+
+        print("About to write to : " +  str(fname))
+        print(data)
+
+        newline_regexp = ""
+
+        spamwriter = ''
+        print("#######################################")
+        with open(fname, 'w', newline='') as csvfile:
+            spamwriter = csv.writer(csvfile, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        
+            print("ok")
+
+            # generate lines
+            for elt in data:
+                line = []
+                print("ok")
+
+                for field in keyfields:
+                    v = elt[field]
+                    # force de decoding
+                    forcedec_v = self.force_decode(v)
+                    print("@@@@@@@@@@@@@@@@@" + forcedec_v)
+                    # force encode to a codec
+                    forcedec_v.encode("utf8")
+                    
+                    line.append(forcedec_v.replace('\r\n', ' ').replace('\n', ' '))
+                    
+                    #print(line)
+
+                spamwriter.writerow(line)
+
+
     def force_decode(self, string, codecs=['cp1252', 'utf8', 'iso-8859-1']):
+        """
+            the function tries to decode the string given a list of codecs
+            return nothing is cannot decode
+        """
         for i in codecs:
             try:
                 s = string.decode(i)
                 return s
             except:
                 pass
-
+        return string
         logging.warn("cannot decode url %s" % ([string]))
 
 
@@ -169,28 +222,69 @@ if __name__ == '__main__':
 
     csv_filename = str(opts.csv_filename)
 
+
+
+    usage = """
+
+        Script qui extrait des données de la db1 et génère soit :
+            - les requêtes sql pour l'update d'une deuxième base
+            - le fichier csv contenant les datas
+
+        %prog --user1 username --pass1 pwd --db1 dbname
+
+    """
+
+    parser=OptionParser(usage=usage)
+    parser.add_option("--trace" ,action="store_true",dest="trace",default=False,help="A utiliser pour declencher un mode verbeux. Default=False")
+    parser.add_option("--user1" , dest="user", help='user Default=user1', default="audiologys")
+    parser.add_option("--pass1" , dest="pwd1", help='pwd Default=pass1', default="audiologys")
+    parser.add_option("--db1"   , dest="db1"  , help='db Default=db1', default="audiologys_utf8")
+    parser.add_option("--output", dest="csv_filename", default='output.csv', help='filename for csv output Default=output.csv', default="description.csv")
+
+    (opts,args) = parser.parse_args()
+
+
+    print(opts)
+    print(args)
+
+    if len(args) > 0:
+        mode = args[0].lower()
+
+    user1 = str(opts.user)
+    pass1 = str(opts.pwd1)
+    db1   = str(opts.db1)
+    csv_filename = str(opts.csv_filename)
+
     # create a connection handler
     # 2 connection to 2 different databases
-    myconn1 = connector("127.0.0.1", 3307, user1, pwd1, db1 )
-    myconn2 = connector("127.0.0.1", 3307, user2, pwd2, db2 )
+
+    myconn1 = connector("127.0.0.1", 3307, user1, pass1, db1 )
+    #myconn2 = connector("127.0.0.1", 3306, "user", "passwd", "db_name" )
+
 
     # 2 instances of myops class
     myops_read  = myops(myconn1)
-    myops_write = myops(myconn2)
+    #myops_write = myops(myconn2)
 
     # launch task function
     # 1/ retrieve data
     data = myops_read.retrieve_fields("articles", ["ref_article", "desc_courte", "desc_longue"], {"ref_art_categ" : "A.C-000000-00003" })
 
+
     # 2/ write data
     myops_write.write_fields("articles_write_utf8", "ref_article", data)
+
+    myops_read.write_csv(csv_filename, ["ref_article", "desc_courte", "desc_longue"], data)
+
+
+
 
     # close cursor and connection
     # connexion 1
     myconn1.cursor.close()
     myconn1.conn.close()
     # connexion 2
-    myconn2.cursor.close()
-    myconn2.conn.close()
+    #myconn2.cursor.close()
+    #myconn2.conn.close()
 
     pass
