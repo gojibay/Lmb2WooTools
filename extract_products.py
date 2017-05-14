@@ -17,6 +17,7 @@ import csv
 import pprint as pp
 from optparse import OptionParser
 import re
+import string
 
 class connector:
 
@@ -33,13 +34,16 @@ class connector:
         )
         self.cursor = self.conn.cursor()
 
+
 class myops:
 
-    def __init__(self, connector):
+    def __init__(self, connector, filename_id_sku):
         self.connector = connector
         self.categories = dict()
         self.annuaire = dict()
         self.images = dict()
+        self.filename_id_sku = filename_id_sku
+        self.table_correspondance = dict()
 
     def initialize(self):
         self.fetch_categories()
@@ -47,6 +51,37 @@ class myops:
         self.fetch_contacts()
         #print(self.annuaire)
         self.fetch_images()
+
+        self.generate_table_correspondances(self.load_id_sku())
+
+
+    # à partir de la table du csv sku;id;ref-lmb extraite de WP on créé la table de corresondance
+    def load_id_sku(self):    
+        with open(self.filename_id_sku , 'r') as f:
+            correspondance = f.readlines()
+        correspondance = [x.strip() for x in correspondance]
+        return correspondance
+
+    def generate_table_correspondances(self, maliste):
+        """
+            création d'un dict aec A-000000-00xxxx en clé et l'id en value
+            regarde warning si doublons
+        """
+        print("Generate_table_correspondances")
+        d = dict()
+        for elt in maliste:
+            c = elt.split(",")
+            reflmb = c[2]
+            wpid   = c[1]
+            #print(reflmb)
+            if reflmb.startswith( 'A-000000-' ):
+                if not reflmb in d.keys():
+                    d[reflmb] = wpid
+                else:
+                    print("WARNING THIS REFERENCE IS ALREADY LINKED TO ANOTHER ID => " + reflmb + " / " + wpid)
+
+        self.table_correspondance = d
+        #print(d)
 
     def retrieve_fields(self, table="", fields_to_retrieve=[], filter_on={}, filter_exclude={}):
         """
@@ -64,9 +99,10 @@ class myops:
         # retrieve fields to get data from
         fields = ""
         for f in fields_to_retrieve:
-            fields += f + ","
+            if f not in ["lib_article_clean"]:
+                fields += f + ","
         fields = fields.strip(',')
-
+        print(fields)
         # retrieve field and value to filter on
         # !!!! first versin on one only value
         #print(filter_on["ref_art_categ"])
@@ -102,12 +138,86 @@ class myops:
 
         #print(myrequest)
 
-        self.connector.cursor.execute(myrequest)
+        result =self.execute_request(myrequest)
+        return result
+
+    def execute_request(self, request):
+        self.connector.cursor.execute(request)
         #print(self.cursor.description)
 
         # retrieve all data in array
         result = self.connector.cursor.fetchall()
         return result
+
+
+    def extract_liaisons(self):
+        print("extract_liaisons")
+        # requette mysql pour récupérer les articles associés de type 1
+        request =  "SELECT al.`ref_article`, al.`ref_article_lie`, al.`id_liaison_type` "
+        request += "FROM articles_liaisons al, articles a "
+        request += "WHERE a.`ref_article` = al.`ref_article` "
+        request += "AND a.`ref_art_categ` = 'A.C-000000-00003' "
+        request += "AND al.`id_liaison_type` = 1 "
+
+        result =self.execute_request(request)
+
+        # cleanup
+        d = self.cleanup_liaisons(result)
+
+
+        all_update_requests = ""
+        # generer les champ meta_value
+        for k,v in d.items():
+            # on récupère la chaine  a:0:{} ...
+            m = self.generate_upsells_ids(k, v)
+            #print(k + " " + m)
+
+            if k in self.table_correspondance.keys():
+                _post_id = self.table_correspondance[k]
+                updaterequest = 'UPDATE `wp_postmeta` SET `meta_value`="' + m + '" WHERE `post_id`="'+ _post_id +'" AND `meta_key` = "_upsell_ids";\n'
+                all_update_requests += updaterequest
+
+
+        return all_update_requests
+
+    def cleanup_liaisons(self, data):
+        print("cleanup_liaisons")
+        # on transforme la data extraite de la base mysql en un dict
+        d = dict()
+
+        for elt in data:
+            appar = elt['ref_article']
+            assoc = elt['ref_article_lie']
+            if appar in d.keys():
+                d[appar].append(assoc)
+            else:
+                d[appar] = [assoc]
+
+        return d  
+
+
+    def generate_upsells_ids(self, ID, upsell_ids_list):
+        # update wp_postmeta table 
+        d = dict()
+        metvalue=""
+        l = upsell_ids_list.__len__()
+        if l > 0:
+            
+            idx = 0
+            for upsell_id in upsell_ids_list:
+                if upsell_id in self.table_correspondance.keys():
+                    upsell_id = self.table_correspondance[upsell_id]
+                    metvalue += "i:"+str(idx)+";i:"+upsell_id+";"
+                    idx += 1
+
+            metvalue += '}'
+            prefmetvalue = 'a:'+str(idx)+':{'
+
+            metvalue = prefmetvalue + metvalue
+
+        return metvalue
+
+
 
 
     def write_csv(self, fname="output.csv", keyfields=['ref_article'], data=[]):
@@ -140,9 +250,12 @@ class myops:
                 line = []
 
                 for field in keyfields:
+                    ### ici on a utilsié des noms de champs qui nexistent pas dans lmb
                     if ( field == 'image'):
                         v = elt['ref_article']
                         v = self.get_image_filename(v)
+                    elif (field == 'lib_article_clean'):
+                        v = elt['lib_article']
                     else:
                         v = elt[field]
 
@@ -163,10 +276,21 @@ class myops:
 
                     if ( field == 'dispo'):
                         #print(field + " "  + str(v))
+                        paa = elt['paa_ht']
+                        #print(paa)
+
                         if v == 1:
-                            v="publish"
+                            if paa and paa > 0.0 :
+                                v="publish"
+                            else:
+                                v='draft'
                         else:
                             v="draft"
+
+                    if ( field == 'lib_article_clean' ):
+                        v = self.cleanup_title(v)
+                        #print("--------------------\n" + v + "\n" + v2)
+                        #print("--------------------\n"  + v2)
 
                     # force de decoding
                     forcedec_v = self.force_decode(v)
@@ -178,19 +302,31 @@ class myops:
                     else:
                         line.append(forcedec_v)
 
+
+
+                ### ADAPT TO YOUR NEEDS ####
                 """
                 Let's add these fields
                    xxx              = manage_stock -> no    
                    xxx              = visibility  -> hidden or catalog
                    xxx              = featured -> no
-                   xxx              = comment_status -> closed
+                   xxx              = comment_status -> closed or open
                    xxx              = ping_status -> closed
                 """
-                line.append("no")
-                line.append("catalog")
-                line.append("no")
-                line.append("closed")
-                line.append("closed")
+
+                if PRODUCT_TYPE == "optionnal":
+                    line.append("no")
+                    line.append("catalog")
+                    line.append("no")
+                    line.append("closed")
+                    line.append("closed")
+                if PRODUCT_TYPE == "appareil":
+                    line.append("no")
+                    line.append("search")
+                    line.append("no")
+                    line.append("open")
+                    line.append("open")
+            
                 spamwriter.writerow(line)
 
 
@@ -293,9 +429,31 @@ class myops:
 
 
 
+    def cleanup_title(self, title):
+        pat = [
+            "appareils? auditifs?", "audio ?proth.ses?", "proth.ses? auditives?", "syst.mes? auditifs?", "appareil correcteur .lectronique",
+            "aide auditive",
+            "audioprothese rechargeable proposée par l’audioprothésiste aux malentendants très agés et malhabiles",
+            "correcteur de surdité",
+            "toutes les surdités", 
+            "surdit. mixte", 
+            "acouph.nes?", 
+            "patient atteint de surdité de transmission", 
+            "pour toutes les surdités", 
+            "prix .quivalent au", "prix", "moins cher", "cher", "surpuissant", "pour", "contre", "existe aussi",
+            "biotone rexton",  "biotone" ,"widex", "starkey", "resound", "beltone", "rexton", "siemens", "phonak", "oticon", "bernafon", 
+            "prodition", "hansaton", "hansaton -? ?audimedi", "unitron", "unitron hearing", "sonic", "sonic innovations", "sona", "newson"
+            ]
+
+        x = title
+        for p in pat:
+            x = re.sub(p, '', x, flags=re.IGNORECASE)
+
+        x = re.sub(' +', ' ', x)
+
+        return x.strip(' ')   
+
 if __name__ == '__main__':
-
-
 
     usage = """
 
@@ -315,8 +473,11 @@ if __name__ == '__main__':
     parser.add_option("--port1"   , dest="port1"  , help='port Default=3307', default=3307)
 
     parser.add_option("--output", dest="csv_filename", default='products.csv', help='filename for csv output Default=output.csv')
+    parser.add_option("-t", "--type", dest="product_type", default="optionnal", help="set this option to 'appareil' or 'optionnal' depending on type of product")
+
 
     (opts,args) = parser.parse_args()
+
 
 
     #print(opts)
@@ -331,6 +492,8 @@ if __name__ == '__main__':
     port1 = opts.port1
     csv_filename = str(opts.csv_filename)
 
+    PRODUCT_TYPE  = str(opts.product_type)
+
     # create a connection handler
     # 2 connection to 2 different databases
     myconn1 = connector("127.0.0.1", port1, user1, pass1, db1 )
@@ -338,26 +501,64 @@ if __name__ == '__main__':
 
     # create instance of myops class
     print("Create instance...")
-    controller = myops(myconn1)
+    controller = myops(myconn1, "liste-id-sku-NO-DELETE-may14.csv")
+
     print("Initializing...")
     controller.initialize()
 
+
+    #controller.generate_upsells_ids("1234", ["6789", "643734", "4534534", "344"])
+    #import sys
+    updatedata = controller.extract_liaisons()
+    with open("update_requests.txt", 'w') as f:
+        f.write(updatedata)
+
+    exit(0)
     print("Retrieving fields...")
     # launch task function
 
-    # Optional products : 
-    fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"]
 
-    # Appareils auditifs
-    fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"]
+    # RETRIEVE DATA
+    if PRODUCT_TYPE == 'optionnal':
+        #on filtre sur les appareils pour extraire tout lce qui n'est pas un appareil
+        
+        # Optional products : 
+        fields_list     = ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"]
+        fields_list_csv = ["ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article", "image"]
+        # Appareils auditifs
+        #fields_list = ["ref_article", "lib_article"]
+        data = controller.retrieve_fields("articles", 
+            fields_list, 
+            {},
+            {"ref_art_categ" : "A.C-000000-00003" }
+            )
+    
+    if PRODUCT_TYPE == 'appareil':
+        #on filtre sur les appareils
+        
+        # Appareils auditifs
+        #fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article", ""]
+        
+        fields_list = ["ref_article", "lib_article", "paa_ht", "dispo"]
+        fields_list_csv = ["ref_article", "ref_article", "lib_article", "lib_article_clean", "paa_ht", "dispo"]
+        # 2 lib_article en version longue et courte
+        # les descriptions sont déjà importées proprement
+        data = controller.retrieve_fields("articles", 
+            fields_list, 
+            {"ref_art_categ" : "A.C-000000-00003" },
+            {}
+            )
 
+    #myops_write.write_mysql_update_request("articles_write_utf8", "ref_article", data)
 
+    #print(data)
 
-    data = controller.retrieve_fields("articles", 
-        fields_list, 
-        {"ref_art_categ" : "A.C-000000-00003" },
-        {}
-        )
+    # WRITE DATA
+    # write fields list to csv file
+    controller.write_csv(csv_filename, 
+        fields_list_csv, 
+        data)
+
 
     """
     ref_article         = SKU
@@ -406,16 +607,6 @@ if __name__ == '__main__':
     # xxx              = comment_status -> closed
     # xxx              = ping_status -> closed
 
-
-
-    #myops_write.write_mysql_update_request("articles_write_utf8", "ref_article", data)
-
-    #print(data)
-
-    # write fields list to csv file
-    controller.write_csv(csv_filename, 
-        fields_list, 
-        data)
 
 
 
