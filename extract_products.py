@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    Script to extact external product from LMB Community db into csv for WooCommerce import 
+    Script to extract product from LMB Community db into csv for WooCommerce import 
 
     1/ extract products (text info) from db
     2/ get images url and generate csv for import
@@ -18,6 +18,7 @@ import pprint as pp
 from optparse import OptionParser
 import re
 import string
+import ressources
 
 class connector:
 
@@ -37,13 +38,25 @@ class connector:
 
 class myops:
 
-    def __init__(self, connector, filename_id_sku):
+    def __init__(self, connector, filename_id_sku=''):
         self.connector = connector
         self.categories = dict()
         self.annuaire = dict()
         self.images = dict()
         self.filename_id_sku = filename_id_sku
+
+        # used for sku / wpip correspondance
         self.table_correspondance = dict()
+
+        # A.C.... -> LMB name of the "caracteristiques"
+        self.caracs_dict = ressources.caracteristiques_id_name
+
+        # A.C.... -> dict of lmb2wp correspondance
+        self.caracs_dict_lmb2wp = ressources.caracteristiques_id_lmb2wp
+
+        # 
+        self.caracs_dict_ordered = sorted(self.caracs_dict.keys())
+        self.caracs_dict_lmb2wp_ordered = sorted(self.caracs_dict_lmb2wp.keys())
 
     def initialize(self):
         self.fetch_categories()
@@ -52,7 +65,12 @@ class myops:
         #print(self.annuaire)
         self.fetch_images()
 
-        self.generate_table_correspondances(self.load_id_sku())
+        # dict de caracteristiques des produits
+        # { ref_aticle : { carac1: value1, carac2 : value2, ... }}
+        self.articles_caracs = self.extract_caracs()
+
+        if self.filename_id_sku != '':
+            self.generate_table_correspondances(self.load_id_sku())
 
 
     # à partir de la table du csv sku;id;ref-lmb extraite de WP on créé la table de corresondance
@@ -61,6 +79,7 @@ class myops:
             correspondance = f.readlines()
         correspondance = [x.strip() for x in correspondance]
         return correspondance
+
 
     def generate_table_correspondances(self, maliste):
         """
@@ -83,9 +102,11 @@ class myops:
         self.table_correspondance = d
         #print(d)
 
+
     def retrieve_fields(self, table="", fields_to_retrieve=[], filter_on={}, filter_exclude={}):
         """
-        This function retrieves the fields given in 'fields_to_retrieve' of the entries having 'key' and matching values 'filter_on' and excluding filter_exclude
+        This function generate the mysql request that retrieves the fields given in 'fields_to_retrieve' 
+        of the entries having 'key' and matching values 'filter_on' and excluding filter_exclude
 
         Exemple : 
         ref_article
@@ -150,7 +171,12 @@ class myops:
         return result
 
 
-    def extract_liaisons(self):
+    def extract_liaisons(self, filename):
+        """
+            Generates mysql request to apply on wp/woocommerce db to link product with upsell products
+
+            Write requests to file 'filename' 
+        """
         print("extract_liaisons")
         # requette mysql pour récupérer les articles associés de type 1
         request =  "SELECT al.`ref_article`, al.`ref_article_lie`, al.`id_liaison_type` "
@@ -178,6 +204,10 @@ class myops:
                 all_update_requests += updaterequest
 
 
+        with open(filename, 'w') as f:
+            f.write(all_update_requests)
+
+
         return all_update_requests
 
     def cleanup_liaisons(self, data):
@@ -194,6 +224,69 @@ class myops:
                 d[appar] = [assoc]
 
         return d  
+
+
+    def extract_caracs(self):
+        """
+            Generates mysql request extract caracteristics of a given article
+
+
+        """
+        print("extract_caracs")
+        # requette mysql pour récupérer les articles associés de type 1
+        request =  "SELECT ac.`ref_article`, ac.`ref_carac`, ac.`valeur` "
+        request += "FROM articles_caracs ac, articles a "
+        request += "WHERE a.`ref_article` = ac.`ref_article` "
+
+        result =self.execute_request(request)
+        #print(result)
+        # cleanup
+        d = self.cleanup_caracs(result)
+        return d
+
+    def cleanup_caracs(self, data):
+        print("cleanup_caracs")
+        # on transforme la data extraite de la base mysql en un dict
+        d = dict()
+        for item in data :
+            ref_article = item['ref_article']
+            ref_carac   = item['ref_carac']
+            valeur      = item['valeur']
+            if self.check_key(ref_article, d):
+                if( not self.check_key(ref_carac, d[ref_article])):
+                    d[ref_article][ref_carac] = valeur
+                else:
+                    print("Key " + ref_carac + " already assigned to " + ref_article)
+            else:
+                elt = dict()
+                elt[ref_carac] = valeur
+                d[ref_article] = elt
+
+        return d
+
+
+    def check_key(self, k, d):
+        return k in d.keys()
+
+# ll = [{'ref_carac': 'ACC-000000-0000d', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000e', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000f', 'valeur': 'oui', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000g', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000h', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000i', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000j', 'valeur': '10', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000k', 'valeur': 'oui', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000m', 'valeur': '17 canaux', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000n', 'valeur': 'Oui', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000l', 'valeur': 'www.resound.fr/', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000o', 'valeur': 'www.youtube.com/watch?v=OmaWrxoclAk&feature=channel&list=UL', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-0000p', 'valeur': 'www.facebook.com/login.php', 'ref_article': 'A-000000-02286'}, 
+# {'ref_carac': 'ACC-000000-00001', 'valeur': 'Micro contour écouteur déporté', 'ref_article': 'A-000000-02288'}, 
+# {'ref_carac': 'ACC-000000-00006', 'valeur': 'Elite', 'ref_article': 'A-000000-02288'}, 
+# {'ref_carac': 'ACC-000000-00008', 'valeur': 'Surdité légere à moyenne de 20 à 70 % de perte', 'ref_article': 'A-000000-02288'}, 
+# {'ref_carac': 'ACC-000000-0000b', 'valeur': 'Classe D', 'ref_article': 'A-000000-02288'}, 
+# {'ref_carac': 'ACC-000000-0000q', 'valeur': 'Début 2016', 'ref_article': 'A-000000-02288'}, 
+# {'ref_carac': 'ACC-000000-0000d', 'valeur': 'oui', 'ref_article': 'A-000000-02288'}]
 
 
     def generate_upsells_ids(self, ID, upsell_ids_list):
@@ -321,14 +414,57 @@ class myops:
                     line.append("closed")
                     line.append("closed")
                 if PRODUCT_TYPE == "appareil":
+                    # TODO : add caracs
+                    print(elt['ref_article'])
+                    c = self.append_caracs(elt['ref_article'])
+                    
+                    line += c 
                     line.append("no")
                     line.append("search")
                     line.append("no")
                     line.append("open")
                     line.append("open")
-            
+                    
+                    print(line)
+
+
                 spamwriter.writerow(line)
 
+
+    def append_caracs(self, ref_article):
+        buf = []
+        # on parcourt une liste de caracteristiuqes
+        for carac in self.caracs_dict_ordered:
+            #print(carac)
+            # si l'article a cette caracteristique
+            if ref_article in self.articles_caracs.keys():
+
+                # si la caracteristique est présente pour cet article
+                if carac in self.articles_caracs[ref_article].keys():
+                    # on récupere la valeur extraite de lmb
+                    c_lmb_value = self.articles_caracs[ref_article][carac]
+                    # la valeur de lmb sera la valeur par défaut
+                    val_for_buf = c_lmb_value
+                    # check that la caracteristique est dans acf
+                    if carac in self.caracs_dict_lmb2wp_ordered :   
+                        c_lmb2acf   = self.caracs_dict_lmb2wp[carac]
+                        # si on a une table de correspondance alors val_for_buf est updaté
+                        if ( c_lmb_value in c_lmb2acf.keys() ):
+                            val_for_buf = self.caracs_dict_lmb2wp[carac][c_lmb_value]
+                        elif ( c_lmb_value.lower() in c_lmb2acf.keys() ):
+                            val_for_buf = self.caracs_dict_lmb2wp[carac][c_lmb_value.lower()]
+                        elif ( c_lmb_value.title() in c_lmb2acf.keys() ):
+                            val_for_buf = self.caracs_dict_lmb2wp[carac][c_lmb_value.title()]
+                        else:
+                            print("MMMMH this value should be dealt with and it is not... check that : " + str(c_lmb_value) + " is in " + str(carac))    
+
+                    # val_for_buf vaut soit la valeur dans lmb soit la valeur de la table de corresondance
+                    buf.append(val_for_buf)
+                else:
+                    # si l'entrée n'existe pas pour ce produit on ajoute un champ vide dans le csv
+                    buf.append('')
+        #print(buf)
+        return buf
 
 
     def fetch_categories(self):
@@ -455,13 +591,17 @@ class myops:
 
 if __name__ == '__main__':
 
+
     usage = """
 
         Script qui extrait des données de la db1 et génère soit :
             - les requêtes sql pour l'update d'une deuxième base
             - le fichier csv contenant les datas
 
-        Usage : script.py --user1 username --pass1 pwd --db1 dbname --output filename.csv
+        Usage : script.py --user1 username --pass1 pwd --db1 dbname --output filename.csv --type [appareil|optionnal]
+
+        Example : python extract_products.py --type appareil --output ici.csv -U
+        extracts product of type appareil + generates upsell requests
 
     """
 
@@ -474,7 +614,7 @@ if __name__ == '__main__':
 
     parser.add_option("--output", dest="csv_filename", default='products.csv', help='filename for csv output Default=output.csv')
     parser.add_option("-t", "--type", dest="product_type", default="optionnal", help="set this option to 'appareil' or 'optionnal' depending on type of product")
-
+    parser.add_option("-U", "--upsells", action="store_true", dest="upsell", default=False, help="set this option to generate upsell requests")
 
     (opts,args) = parser.parse_args()
 
@@ -491,7 +631,7 @@ if __name__ == '__main__':
     db1   = str(opts.db1)
     port1 = opts.port1
     csv_filename = str(opts.csv_filename)
-
+    UPSELL = opts.upsell
     PRODUCT_TYPE  = str(opts.product_type)
 
     # create a connection handler
@@ -501,19 +641,21 @@ if __name__ == '__main__':
 
     # create instance of myops class
     print("Create instance...")
-    controller = myops(myconn1, "liste-id-sku-NO-DELETE-may14.csv")
+    if UPSELL:
+        controller = myops(myconn1, "liste-id-sku-NO-DELETE-may14.csv")
+    else:
+        controller = myops(myconn1)
 
     print("Initializing...")
     controller.initialize()
 
+    ## FOR TESTING
+    
+    if UPSELL:
+        print("Extracting links between products and optionnal products for upsells linking...")
+        controller.extract_liaisons("update_requests.txt")
 
-    #controller.generate_upsells_ids("1234", ["6789", "643734", "4534534", "344"])
-    #import sys
-    updatedata = controller.extract_liaisons()
-    with open("update_requests.txt", 'w') as f:
-        f.write(updatedata)
 
-    exit(0)
     print("Retrieving fields...")
     # launch task function
 
@@ -539,7 +681,7 @@ if __name__ == '__main__':
         # Appareils auditifs
         #fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article", ""]
         
-        fields_list = ["ref_article", "lib_article", "paa_ht", "dispo"]
+        fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "paa_ht", "dispo" ]
         fields_list_csv = ["ref_article", "ref_article", "lib_article", "lib_article_clean", "paa_ht", "dispo"]
         # 2 lib_article en version longue et courte
         # les descriptions sont déjà importées proprement
@@ -582,10 +724,10 @@ if __name__ == '__main__':
 
     "ref_article", "lib_article", "desc_courte", "desc_longue", "ref_art_categ", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article"
 
-
-
-
     """
+
+
+
 
     table_correspondance = {
         "ref_article"       : "SKU",
@@ -619,3 +761,5 @@ if __name__ == '__main__':
     #myconn2.conn.close()
 
     pass
+
+

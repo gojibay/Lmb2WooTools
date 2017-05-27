@@ -1,0 +1,150 @@
+liste_acf.txt
+
+MARQUE : MARQUE
+audio_service : Audio Service
+beltone : Beltone
+bernafon : Bernafon
+biotone : Biotone
+biotone_rexton : Biotone Rexton
+coselgi appareil auditif : Coselgi appareil auditif
+hansaton_audiomedi : Hansaton - Audiomedi
+interton : Interton
+newson : Newson
+oticon : Oticon
+phonak : Phonak
+resound : Resound
+rexton : Rexton
+siemens : Siemens
+sona : Sona
+sonic_innovations : Sonic Innovations
+starkey : Starkey
+unitron_hearing : Unitron Hearing
+widex : Widex
+autre : Autre
+
+
+TYPE : TYPE
+branche_de_lunette : Branche de lunette
+branche_de_lunette_auditive : Branche de lunette auditive
+contour_d_oreille : Contour d'oreille
+contour_d_oreille_standard : Contour d'oreille standard
+contour_ecouteur_deporte : Contour écouteur déporté
+intra_classique : Intra classique
+intra_tres_discret : Intra très discret
+intra_auriculaire : Intra-auriculaire
+intra_auriculaire_discret : Intra-auriculaire discret
+intra_auriculaire_tres_discret : Intra-auriculaire très discret
+intra_auriculaire_classique : Intra-auriculaire classique
+micro_contour_d_oreille : Micro contour d'oreille
+micro_contour_open : Micro contour open
+micro_contour_standard : Micro contour standard
+micro_contour_ecouteur_deporte : Micro contour à écouteur déporté
+appareil_auditif_invisible : appareil auditif invisible
+appareil_auditif_tres_discret : appareil auditif très discret
+intra_cic_micro_deporte : intra CIC micro déporté
+intra_conduit_micro_deporte : intra conduit micro déporté
+intra_invisible : intra invisible
+
+GAMME: GAMME
+confort : Confort
+elite : Elite
+excellence : Excellence
+extra : Extra
+optimum : Optimum
+premier : Premier
+
+
+CLASS : CLASS
+
+classe_a : Classe A
+classe_b : Classe B
+classe_c : Classe C
+classe_d : Classe D
+
+
+Date
+
+2011_avant : Avant 2011
+2012_debut : Début 2012
+2012_fin : Fin 2012
+2012_mi : Mi 2012
+2013 : 2013
+2013_debut : Début 2013
+2013_fin : Fin 2013
+2013_mi : Mi 2013
+2014 : 2014
+2014_debut : Début 2014
+2014_fin : Fin 2014
+2015 : 2015
+2015_debut : Début 2015
+2015_fin : Fin 2015
+2016 : 2016
+2016_debut : Début 2016
+2016_fin : Fin 2016
+2016_mi : Mi 2016
+2017_debut : Début 2017
+2017_fin : Fin 2017
+2017_mi : Mi 2017
+2018 : 2018
+2018_debut : Début 2018
+2018_mi : Mi 2018
+2018_fin : Fin 2018
+
+
+Telcommande
+oui : oui
+oui_telecommande : oui avec télécommande uniquement
+non: non
+
+
+REgelage volume
+
+Piles:
+10 : 10
+13 : 13
+312 : 312
+675 : 675
+accu_type_10 : Accu Type 10
+accu_type_13 : Accu Type 13
+accu_type_312 : Accu Type 312
+large_bande : Large bande
+systeme_channel_free : Système Channel Free
+
+
+Cannaux
+2_canaux : 2 canaux
+3_canaux : 3 canaux
+4_canaux : 4 canaux
+5_canaux : 5 canaux
+6_canaux : 6 canaux
+7_canaux : 7 canaux
+8_canaux : 8 canaux
+9_canaux : 9 canaux
+10_canaux : 10 canaux
+11_canaux : 11 canaux
+12_canaux : 12 canaux
+13_canaux : 13 canaux
+14_canaux : 14 canaux
+15_canaux : 15 canaux
+16_canaux : 16 canaux
+17_canaux : 17 canaux
+18_canaux : 18 canaux
+20_canaux : 20 canaux
+24_canaux : 24 canaux
+
+
+surdite_legere_de_20_a_40_de_perte : Surdité légère de 20 à 40 % de perte
+surdite_legere_a_moyenne : Surdité légère à moyenne
+surdite_legere_a_moyenne_de_20_a_70_de_perte : Surdité légère à moyenne de 20 à 70 % de perte
+surdite_legere_a_severe : Surdité légère à sévère
+surdite_legere_a_severe_de_20_a_90_de_perte : Surdité légere à sévère de 20 à 90% de perte
+surdite_moyenne_a_profonde_de_40_a_plus_de_90_de_perte : Surdité moyenne à profonde de 40 à + de 90 % de perte
+surdite_moyenne_a_severe : Surdité moyenne à sévère
+surdite_moyenne_a_severe_de_40_a_90_de_perte : Surdité moyenne à sévère de 40 à 90 % de perte
+surdite_moyenne_de_40_a_70 : Surdité moyenne de 40 à 70 %
+surdite_profonde : Surdité profonde
+surdite_profonde_plus_de_90_de_perte_auditive_moyenne : Surdité profonde + de 90 % de perte auditive moyenne
+surdite_severe_a_profonde : Surdité sévère à profonde
+surdite_severe_a_profonde_de_70_a_plus_de_90_de_perte : Surdité sévère à profonde de 70 à + de 90% de perte
+surdite_severe_de_70_a_90 : Surdité sévère de 70 à 90 %
+
