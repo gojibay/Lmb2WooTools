@@ -17,7 +17,7 @@ marque = {
 	"Bernafon" : "bernafon",
 	"Biotone" : "biotone",
 	"Biotone Rexton" : "biotone_rexton",
-	"Coselgi appareil auditif" : "coselgi appareil auditif",
+	"Coselgi appareil auditif" : "coselgi_appareil_auditif",
 	"Hansaton - Audiomedi" : "hansaton_audiomedi",
 	"Hansaton" : "hansaton",
 	"Interton" : "interton",
