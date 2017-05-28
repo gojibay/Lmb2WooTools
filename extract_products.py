@@ -42,7 +42,13 @@ class myops:
         self.connector = connector
         self.categories = dict()
         self.annuaire = dict()
+        
+        # conteint la liste de la featured image pour les produits
         self.images = dict()
+
+        # conteint la liste des autres image pour les produits
+        self.images_for_gallery = dict()
+
         self.filename_id_sku = filename_id_sku
 
         # used for sku / wpip correspondance
@@ -63,7 +69,9 @@ class myops:
         #print(self.categories)
         self.fetch_contacts()
         #print(self.annuaire)
+        # on récupère les images 
         self.fetch_images()
+        self.fetch_gallery_images()
 
         # dict de caracteristiques des produits
         # { ref_aticle : { carac1: value1, carac2 : value2, ... }}
@@ -268,25 +276,6 @@ class myops:
     def check_key(self, k, d):
         return k in d.keys()
 
-# ll = [{'ref_carac': 'ACC-000000-0000d', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000e', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000f', 'valeur': 'oui', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000g', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000h', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000i', 'valeur': 'non', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000j', 'valeur': '10', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000k', 'valeur': 'oui', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000m', 'valeur': '17 canaux', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000n', 'valeur': 'Oui', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000l', 'valeur': 'www.resound.fr/', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000o', 'valeur': 'www.youtube.com/watch?v=OmaWrxoclAk&feature=channel&list=UL', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-0000p', 'valeur': 'www.facebook.com/login.php', 'ref_article': 'A-000000-02286'}, 
-# {'ref_carac': 'ACC-000000-00001', 'valeur': 'Micro contour écouteur déporté', 'ref_article': 'A-000000-02288'}, 
-# {'ref_carac': 'ACC-000000-00006', 'valeur': 'Elite', 'ref_article': 'A-000000-02288'}, 
-# {'ref_carac': 'ACC-000000-00008', 'valeur': 'Surdité légere à moyenne de 20 à 70 % de perte', 'ref_article': 'A-000000-02288'}, 
-# {'ref_carac': 'ACC-000000-0000b', 'valeur': 'Classe D', 'ref_article': 'A-000000-02288'}, 
-# {'ref_carac': 'ACC-000000-0000q', 'valeur': 'Début 2016', 'ref_article': 'A-000000-02288'}, 
-# {'ref_carac': 'ACC-000000-0000d', 'valeur': 'oui', 'ref_article': 'A-000000-02288'}]
 
 
     def generate_upsells_ids(self, ID, upsell_ids_list):
@@ -347,6 +336,9 @@ class myops:
                     if ( field == 'image'):
                         v = elt['ref_article']
                         v = self.get_image_filename(v)
+                    elif ( field == 'images_product_gallery'):
+                        v = elt['ref_article']
+                        v = self.get_images_filenames_for_gallery(v)     
                     elif (field == 'lib_article_clean'):
                         v = elt['lib_article']
                     else:
@@ -363,9 +355,6 @@ class myops:
                         #print(field + " "  + str(v))
                         if v:
                             v = self.get_nom_from_refcontact(v)
-                    if ( field == 'image'):
-                        v = elt['ref_article']
-                        v = self.get_image_filename(v)
 
                     if ( field == 'dispo'):
                         #print(field + " "  + str(v))
@@ -415,7 +404,7 @@ class myops:
                     line.append("closed")
                 if PRODUCT_TYPE == "appareil":
                     # TODO : add caracs
-                    print(elt['ref_article'])
+                    #print(elt['ref_article'])
                     c = self.append_caracs(elt['ref_article'])
                     
                     line += c 
@@ -425,7 +414,7 @@ class myops:
                     line.append("open")
                     line.append("open")
                     
-                    print(line)
+                    #print(line)
 
 
                 spamwriter.writerow(line)
@@ -463,6 +452,8 @@ class myops:
                 else:
                     # si l'entrée n'existe pas pour ce produit on ajoute un champ vide dans le csv
                     buf.append('')
+            else:
+                buf.append('')
         #print(buf)
         return buf
 
@@ -504,24 +495,82 @@ class myops:
         self.annuaire = d
 
     def fetch_images(self):
-        request = "SELECT a.ref_article, b.lib_file, c.ref_art_categ FROM articles_images AS a, images_articles AS b, articles AS c WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article AND a.ordre=1 AND c.ref_art_categ!='A.C-000000-00003'"
+        request = "SELECT a.ref_article, b.lib_file, c.ref_art_categ \
+                    FROM articles_images AS a, images_articles AS b, articles AS c \
+                    WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article AND a.ordre=1 "
+
+        if PRODUCT_TYPE == 'appareil':
+            request += " AND c.ref_art_categ = 'A.C-000000-00003'"
+        else:
+            request += " AND c.ref_art_categ != 'A.C-000000-00003'"
+
         d = self.fetch_data_in_db(request, 'ref_article', 'lib_file')
         self.images = d
+
+    def fetch_gallery_images(self):
+        request = "SELECT a.ref_article, b.lib_file, c.ref_art_categ \
+                    FROM articles_images AS a, images_articles AS b, articles AS c \
+                    WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article AND a.ordre>1 "
+
+        if PRODUCT_TYPE == 'appareil':
+            request += " AND c.ref_art_categ = 'A.C-000000-00003'"
+        else:
+            request += " AND c.ref_art_categ != 'A.C-000000-00003'"
+
+        d = self.fetch_data_in_db_for_gallery(request, 'ref_article', 'lib_file')
+        self.images_for_gallery = d
+
 
     def fetch_data_in_db(self, req, key, value):
         """
             exemple 
-            SELECT a.ref_article, b.lib_file, c.ref_art_categ FROM articles_images AS a, images_articles AS b, articles AS c WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article AND a.ordre=1 AND c.ref_art_categ!='A.C-000000-00003'
+            SELECT a.ref_article, b.lib_file, c.ref_art_categ FROM articles_images 
+            AS a, images_articles AS b, articles AS c WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article 
+            AND a.ordre=1   <= !!!! we only have one article at a time 
+            AND c.ref_art_categ!='A.C-000000-00003'
         """
         d = {}
         try:
             if req:
                 self.connector.cursor.execute(req)
                 result = self.connector.cursor.fetchall()
+                #print(result)
+                for item in result:
+                    k = item[key]
+                    #print(k)
+                    v = item[value]
+                    #print(v)
+
+                    d[k] = v
+            return d
+        except:
+            return {}
+
+
+    def fetch_data_in_db_for_gallery(self, req, key, value):
+        """
+            exemple 
+            SELECT a.ref_article, b.lib_file, c.ref_art_categ FROM articles_images 
+            AS a, images_articles AS b, articles AS c WHERE a.id_image=b.id_image AND a.ref_article=c.ref_article 
+            AND a.ordre > 1   <= !!!! we have multiple images possibly
+            AND c.ref_art_categ!='A.C-000000-00003'
+        """
+        d = {}
+        try:
+            if req:
+                self.connector.cursor.execute(req)
+                result = self.connector.cursor.fetchall()
+                # EXAMPLE :   {'ref_article': 'A-000000-02317', 'lib_file': '152bcd03be083c8a11ca257b30b45491cros.png', 'ref_art_categ': 'A.C-000000-00003'}, 
+                #print(result)
                 for item in result:
                     k = item[key]
                     v = item[value]
-                    d[k] = v
+                    if k in d.keys():
+                        #print("new image ")
+                        d[k] =  d[k] + "|" + v
+                    else:
+                        d[k] = v
+            #print(d)
             return d
         except:
             return {}
@@ -548,6 +597,22 @@ class myops:
                 
         return ''
 
+    def get_images_filenames_for_gallery(self, ref):
+        if len(self.images_for_gallery):
+            try:
+                fimg = self.images_for_gallery[ref]
+                url=""
+                for image_name in fimg.split('|'):
+                    url += "http://www.audiologys.com/image_pour_import/articles/"+image_name + "|"
+                return url
+            except:
+                return ''
+                
+        return ''
+
+
+
+
     def force_decode(self, string, codecs=['cp1252', 'utf8', 'iso-8859-1']):
         """
             the function tries to decode the string given a list of codecs
@@ -570,10 +635,13 @@ class myops:
             "appareils? auditifs?", "audio ?proth.ses?", "proth.ses? auditives?", "syst.mes? auditifs?", "appareil correcteur .lectronique",
             "aide auditive",
             "audioprothese rechargeable proposée par l’audioprothésiste aux malentendants très agés et malhabiles",
+            "proposée par l’audioprothésiste aux malentendants très agés et malhabiles",
             "correcteur de surdité",
             "toutes les surdités", 
             "surdit. mixte", 
             "acouph.nes?", 
+            "telecommande rc dex comprise",
+            "generateur de bruit",
             "patient atteint de surdité de transmission", 
             "pour toutes les surdités", 
             "prix .quivalent au", "prix", "moins cher", "cher", "surpuissant", "pour", "contre", "existe aussi",
@@ -678,11 +746,21 @@ if __name__ == '__main__':
     if PRODUCT_TYPE == 'appareil':
         #on filtre sur les appareils
         
+        """
+            indiquer le nom du champ dans la base lmb ou encore les champs suivants qui on un traitement spécial
+
+            image -> renvoie l'url de l'image qui sera récupérée par WP à l'import
+            images_product_gallery-> renvoie l'url des images d'ordre > 1 pour gallery d'images
+            lib_article_clean -> génére le libellé de l'article nettoyé
+        """
+
         # Appareils auditifs
         #fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article", ""]
         
         fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "paa_ht", "dispo" ]
-        fields_list_csv = ["ref_article", "ref_article", "lib_article", "lib_article_clean", "paa_ht", "dispo"]
+        fields_list_csv = ["ref_article", "ref_article", "lib_article", "lib_article_clean", "image", "images_product_gallery", "paa_ht", "dispo"]
+        #fields_list_csv = ["ref_article", "image", "images_product_gallery"]
+        
         # 2 lib_article en version longue et courte
         # les descriptions sont déjà importées proprement
         data = controller.retrieve_fields("articles", 
@@ -715,6 +793,10 @@ if __name__ == '__main__':
     dispo               = post_status -> publish
                                         private ou draft
     image               = featured_image
+
+    caracs ...
+
+
 
        xxx              = manage_stock -> no    
        xxx              = visibility  -> hidden  / catalog
