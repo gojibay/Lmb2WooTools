@@ -276,6 +276,24 @@ class myops:
     def check_key(self, k, d):
         return k in d.keys()
 
+    def generate_marque(self, libelle):
+        pattern_list = ['audio service', 'beltone', 'bernafon', 'biotone rexton',
+                'coselgi appareil auditif', 'hansaton - audiomedi', 'interton', 'newson',
+                'oticon', 'phonak', 'resound', 'rexton', 'siemens', 'sona', 'sonic innovations',
+                'starkey', 'unitron hearing', 'widex', 'autre']
+
+        i =  0
+        for pattern in pattern_list:
+            brandreg = re.compile(pattern)
+            result = brandreg.search(libelle)
+            if (result) :
+                return pattern
+            elif (i == len(pattern_list)-1):
+                return 'autre'
+            i = i + 1
+        return 'autre'
+
+
 
 
     def generate_upsells_ids(self, ID, upsell_ids_list):
@@ -405,11 +423,13 @@ class myops:
                 if PRODUCT_TYPE == "appareil":
                     # TODO : add caracs
                     #print(elt['ref_article'])
-                    c = self.append_caracs(elt['ref_article'])
-                    
+                    if elt['lib_article']:
+                        c = self.append_caracs(elt['ref_article'], elt['lib_article'])
+                    else:
+                        c = self.append_caracs(elt['ref_article'], '')          
                     line += c 
                     line.append("no")
-                    line.append("search")
+                    line.append("visible")
                     line.append("no")
                     line.append("open")
                     line.append("open")
@@ -420,7 +440,7 @@ class myops:
                 spamwriter.writerow(line)
 
 
-    def append_caracs(self, ref_article):
+    def append_caracs(self, ref_article, libelle_article):
         buf = []
         # on parcourt une liste de caracteristiuqes
         for carac in self.caracs_dict_ordered:
@@ -451,7 +471,12 @@ class myops:
                     buf.append(val_for_buf)
                 else:
                     # si l'entrée n'existe pas pour ce produit on ajoute un champ vide dans le csv
-                    buf.append('')
+                    if carac == "ACC-000000-0000c":
+                        marque = ''
+                        marque = self.generate_marque(libelle_article)
+                        buf.append(marque)
+                    else:
+                        buf.append('')
             else:
                 buf.append('')
         #print(buf)
@@ -757,10 +782,12 @@ if __name__ == '__main__':
         # Appareils auditifs
         #fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "modele", "ref_constructeur", "paa_ht", "id_tva", "dispo", "ref_article", ""]
         
+        ### NOTE : "lib_article" doit toujours ets fourni pour générer la marque
         fields_list = ["ref_article", "lib_article", "desc_courte", "desc_longue", "paa_ht", "dispo" ]
         fields_list_csv = ["ref_article", "ref_article", "lib_article", "lib_article_clean", "image", "images_product_gallery", "paa_ht", "dispo"]
         #fields_list_csv = ["ref_article", "image", "images_product_gallery"]
-        
+        fields_list_csv = ["ref_article", "lib_article"]
+
         # 2 lib_article en version longue et courte
         # les descriptions sont déjà importées proprement
         data = controller.retrieve_fields("articles", 
